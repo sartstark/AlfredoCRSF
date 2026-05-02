@@ -2,7 +2,7 @@
 
 This library is based on CapnBry's CRSF code, it has been modified to match the format of standard Arduino Library. Keywords and example files included. It has also now been extended to support more telemetry packet types. Check out the example files to learn more.
 
-This library was designed for ELRS but should be compatible with any CRSF receiver.
+This library was designed for ELRS but should be compatible with any CRSF receiver. Compatible with ExpressLRS 4.0+ (the parser accepts the relaxed minimum frame length introduced in ELRS 4.0 PR #3429 and routes ATTITUDE under the 0xC8 sync byte that ELRS 4.0 forces on every serial frame).
 
 TODO:
 * For now callbacks have been removed. May add them back or replace with a flag system to alert when packets come in.
@@ -28,15 +28,23 @@ The CRSF protocol is not documented or maintained by one single entity. The foll
 * CRSF_ADDRESS_RADIO_TRANSMITTER  = (0xEA) //Going to the handset
 * CRSF_ADDRESS_FLIGHT_CONTROLLER = (0xC8)  //Going to the flight controller
 * CRSF_ADDRESS_CRSF_RECEIVER = (0xEC)      //Going to the receiver (from FC)
+* CRSF_ADDRESS_ELRS_LUA = (0xEF)           //ELRS LUA script
+
+Note: ExpressLRS 4.0 always emits 0xC8 (CRSF_SYNC_BYTE / FLIGHT_CONTROLLER) as the first byte of every frame on the serial wire, regardless of the original destination. Telemetry that older firmware addressed to the handset (e.g. ATTITUDE) now arrives addressed to the FC.
 
 ### LEN - Length of bytes that follow
-Overall packet length is PayloadLength+4 (dest, len, type, crc), or LEN+2 (dest, len).
+Overall packet length is PayloadLength+4 (dest, len, type, crc), or LEN+2 (dest, len). Valid LEN range is 2 (broadcast frames with empty payload, per ELRS 4.0 PR #3429) up to CRSF_MAX_PACKET_LEN-2 = 62.
 
 ### TYPE - CRSF_FRAMETYPE
 * CRSF_FRAMETYPE_GPS = 0x02,
 * CRSF_FRAMETYPE_VARIO = 0x07,
 * CRSF_FRAMETYPE_BATTERY_SENSOR = 0x08,
 * CRSF_FRAMETYPE_BARO_ALTITUDE = 0x09,
+* CRSF_FRAMETYPE_AIRSPEED = 0x0A,         //added in ELRS 4.0
+* CRSF_FRAMETYPE_HEARTBEAT = 0x0B,
+* CRSF_FRAMETYPE_RPM = 0x0C,              //added in ELRS 4.0
+* CRSF_FRAMETYPE_TEMP = 0x0D,             //added in ELRS 4.0
+* CRSF_FRAMETYPE_CELLS = 0x0E,            //added in ELRS 4.0
 * CRSF_FRAMETYPE_LINK_STATISTICS = 0x14,
 * CRSF_FRAMETYPE_OPENTX_SYNC = 0x10,
 * CRSF_FRAMETYPE_RADIO_ID = 0x3A,
@@ -51,6 +59,7 @@ Overall packet length is PayloadLength+4 (dest, len, type, crc), or LEN+2 (dest,
 * CRSF_FRAMETYPE_PARAMETER_SETTINGS_ENTRY = 0x2B,
 * CRSF_FRAMETYPE_PARAMETER_READ = 0x2C,
 * CRSF_FRAMETYPE_PARAMETER_WRITE = 0x2D,
+* CRSF_FRAMETYPE_ELRS_STATUS = 0x2E,      //ELRS good/bad packet count and status flags
 * CRSF_FRAMETYPE_COMMAND = 0x32,
 // KISS frames
 * CRSF_FRAMETYPE_KISS_REQ  = 0x78,
@@ -126,6 +135,7 @@ Includes all bytes from type (buffer[2]) to end of payload.
 * unsigned ch13 : 11;
 * unsigned ch14 : 11;
 * unsigned ch15 : 11;
+* uint8_t status; //ELRS-only extension byte. Bit 0 = ARMED, bit 1 = ARMING_MODE_CH5. Ignored by this parser.
 ### CRSF_FRAMETYPE_LINK_RX_ID = 0x1C
 * uint8_t rxRssiPercent; 
 * uint8_t rxRfPower;  //should be signed int?
@@ -134,9 +144,9 @@ Includes all bytes from type (buffer[2]) to end of payload.
 * uint8_t txRfPower;  //should be signed int?
 * uint8_t txFps;
 ### CRSF_FRAMETYPE_ATTITUDE = 0x1E
-* uint16_t pitch;  // pitch in radians, BigEndian
-* uint16_t roll;   // roll in radians, BigEndian
-* uint16_t yaw;    // yaw in radians, BigEndian
+* int16_t pitch;   // radians * 10000, BigEndian
+* int16_t roll;    // radians * 10000, BigEndian
+* int16_t yaw;     // radians * 10000, BigEndian
 ### CRSF_FRAMETYPE_FLIGHT_MODE = 0x21
 * char[]; //Flight mode ( Null-terminated string )
 // Extended Header Frames, range: 0x28 to 0x96
