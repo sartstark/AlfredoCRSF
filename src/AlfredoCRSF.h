@@ -31,6 +31,11 @@ public:
     const crsf_sensor_attitude_t *getAttitudeSensor() const { return &_attitudeSensor; }
     bool isLinkUp() const { return _linkIsUp; }
 
+    // Timestamp (millis()) of the most recently received RC_CHANNELS_PACKED
+    // frame, or 0 if none has arrived yet. Useful for measuring inter-frame
+    // latency from the outside.
+    uint32_t getLastChannelsPacketTime() const { return _lastChannelsPacket; }
+
 private:
     Stream* _port;
     uint8_t _rxBuf[CRSF_MAX_PACKET_LEN+3];
